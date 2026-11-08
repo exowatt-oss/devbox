@@ -1,0 +1,119 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Set up pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Test
+        run: pnpm test
+      - name: Lint
+        run: pnpm lint
+      - name: Check max-lines ratchet
+        run: pnpm check:max-lines-ratchet
+      - name: Check Devbox requirements
+        run: pnpm check:devbox-requirements
+      - name: Check release tag
+        run: node config/scripts/check-release-tag.mjs "$GITHUB_REF_NAME"
+
+  build:
+    needs: verify
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: darwin-arm64
+            os: macos-14
+          - target: darwin-x64
+            os: macos-15-intel
+          - target: linux-x64
+            os: ubuntu-24.04
+          # GitHub-hosted native arm64 runner; no cross-compile.
+          - target: linux-arm64
+            os: ubuntu-24.04-arm
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Set up pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Bundle CLI
+        run: pnpm bundle
+      - name: Build SEA executable
+        run: node config/scripts/build-sea.mjs
+      - name: Smoke test executable
+        run: dist/release/devbox-${{ matrix.target }} --version
+      - name: Package release asset
+        run: node config/scripts/package-release-asset.mjs "${{ matrix.target }}"
+      - name: Attest release asset
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: dist/release/devbox-${{ matrix.target }}.tar.gz
+      - name: Upload release asset
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-${{ matrix.target }}
+          path: dist/release/devbox-${{ matrix.target }}.tar.gz
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Download release assets
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: release-*
+          path: dist/release
+          merge-multiple: true
+      - name: Add installer
+        run: cp scripts/devbox-install.sh dist/release/devbox-install.sh
+      - name: Write release checksums
+        run: node config/scripts/write-checksums.mjs dist/release
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" dist/release/*.tar.gz dist/release/devbox-install.sh dist/release/SHA256SUMS \
+            --title "Devbox $TAG" \
+            --generate-notes

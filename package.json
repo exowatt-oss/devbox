@@ -1,0 +1,46 @@
+{
+  "name": "devbox",
+  "version": "0.6.9",
+  "private": true,
+  "license": "Apache-2.0",
+  "description": "Standalone Devbox: resilient roaming dev workspaces (pair/sync/jobs/ports over SSH + Mutagen). Own CLI + binaries.",
+  "repository": { "type": "git", "url": "git+https://github.com/exowatt-oss/devbox.git" },
+  "homepage": "https://github.com/exowatt-oss/devbox#readme",
+  "bugs": { "url": "https://github.com/exowatt-oss/devbox/issues" },
+  "type": "module",
+  "bin": {
+    "devbox": "./dist/cli/index.mjs"
+  },
+  "engines": {
+    "node": "24"
+  },
+  "packageManager": "pnpm@10.24.0+sha512.01ff8ae71b4419903b65c60fb2dc9d34cf8bb6e06d03bde112ef38f7a34d6904c424ba66bea5cdcf12890230bf39f9580473140ed9c946fef328b6e5238a345a",
+  "scripts": {
+    "bundle": "esbuild src/cli/index.ts --bundle --platform=node --target=node24 --format=esm --outfile=dist/cli/index.mjs --banner:js=\"import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\"",
+    "build": "pnpm typecheck && pnpm bundle",
+    "build:sea": "node config/scripts/build-sea.mjs",
+    "typecheck": "tsc --noEmit -p config/tsconfig.json",
+    "test": "vitest run --config config/vitest.config.ts",
+    "lint": "oxlint",
+    "check:max-lines-ratchet": "node config/scripts/check-max-lines-ratchet.mjs",
+    "check:devbox-requirements": "node config/scripts/check-devbox-requirement-matrix.mjs",
+    "ci": "pnpm typecheck && pnpm test && pnpm lint && pnpm check:max-lines-ratchet && pnpm check:devbox-requirements"
+  },
+  "dependencies": {
+    "ssh2": "1.17.0"
+  },
+  "devDependencies": {
+    "@types/node": "25.6.0",
+    "@types/ssh2": "1.15.5",
+    "esbuild": "0.28.1",
+    "oxlint": "1.71.0",
+    "postject": "1.0.0-alpha.6",
+    "typescript": "7.0.2",
+    "vitest": "4.1.11"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}
