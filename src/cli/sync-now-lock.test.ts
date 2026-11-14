@@ -36,6 +36,7 @@ describe('db sync run lock', () => {
       path,
       pid: 333,
       isAlive: (pid) => pid === 222,
+      startedAtOf: () => 1,
       onWait: (seen) => waits.push(seen),
       sleep: async () => {
         sleeps += 1
