@@ -36,9 +36,13 @@
     "oxlint": "1.71.0",
     "postject": "1.0.0-alpha.6",
     "typescript": "7.0.2",
-    "vitest": "4.1.11"
+    "vite": "8.2.4",
+    "vitest": "4.1.12"
   },
   "pnpm": {
+    "overrides": {
+      "source-map-js": "1.2.2"
+    },
     "onlyBuiltDependencies": [
       "esbuild"
     ]
